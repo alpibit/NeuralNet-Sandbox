@@ -11,10 +11,15 @@ include 'public/templates/header.php';
         Your browser does not support the canvas element.
     </canvas>
 
+    <div id="aiMetrics">
+        <h3>AI Metrics</h3>
+        <pre id="metricsData">Loading metrics...</pre>
+    </div>
     <div id="aiState">
         <h3>AI State</h3>
         <pre id="stateData">Loading state...</pre>
     </div>
+
 
 </main>
 <?php
