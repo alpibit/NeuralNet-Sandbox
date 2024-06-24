@@ -14,11 +14,14 @@ $stateRecords = $nnState->loadState();
 if (!empty($stateRecords)) {
     $formattedState = [
         'weights' => [],
-        'biases' => []
+        'biases' => [],
+        'metadata' => []
     ];
 
     foreach ($stateRecords as $record) {
-        if ($record['type'] == 'weight') {
+        if ($record['layer'] === 'metadata') {
+            $formattedState['metadata'][$record['type']] = json_decode($record['data'], true);
+        } elseif ($record['type'] == 'weight') {
             $formattedState['weights'][$record['layer']] = json_decode($record['data'], true);
         } elseif ($record['type'] == 'bias') {
             $formattedState['biases'][$record['layer']] = json_decode($record['data'], true);

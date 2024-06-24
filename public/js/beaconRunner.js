@@ -15,18 +15,23 @@ class Beacon {
 
     isReached(entityX, entityY) {
         // Check if the entity has reached the beacon
-        // Simple check: entity is considered to have reached the beacon if it is within the beacon's area
-        return (
-            entityX >= this.x &&
-            entityX <= this.x + this.width &&
-            entityY >= this.y &&
-            entityY <= this.y + this.height
+        // Entity is considered to have reached the beacon if it is within or touching the beacon's area
+        const reached = (
+            entityX + 15 >= this.x &&
+            entityX - 15 <= this.x + this.width &&
+            entityY + 15 >= this.y &&
+            entityY - 15 <= this.y + this.height
         );
+        if (reached) {
+            console.log("Beacon reached check: true");
+        }
+        return reached;
     }
 
     setLocation(x, y) {
         // Set a new location for the beacon
         this.x = x;
         this.y = y;
+        console.log("Beacon location set to:", x, y);
     }
 }

@@ -12,7 +12,6 @@ class EntityAI {
         this.actionCooldown = 5000;
         this.debug = true;
 
-        // New properties for improved reward system
         this.exploredAreas = new Set();
         this.lastPosition = { x: this.entityRenderer.x, y: this.entityRenderer.y };
         this.stationaryCounter = 0;
@@ -23,6 +22,7 @@ class EntityAI {
         this.lastBeaconDistance = Infinity;
         this.cumulativeReward = 0;
         this.lastAction = null;
+        this.isBeaconReached = false;
     }
 
     startMonitoring() {
@@ -35,7 +35,7 @@ class EntityAI {
             } else {
                 this.epsilon = Math.max(this.epsilon * 0.99, 0.1);
             }
-        }, 5000); // Check every 5 seconds
+        }, 5000);
     }
 
     update() {
@@ -74,7 +74,7 @@ class EntityAI {
     }
 
     makeDecision(decision) {
-        const actionThreshold = 0.4;  // Adjusted threshold
+        const actionThreshold = 0.4;
         let actionTaken = false;
 
         if (decision[0] > actionThreshold) {
@@ -100,7 +100,7 @@ class EntityAI {
     }
 
     takeRandomAction() {
-        const randomAction = Math.floor(Math.random() * 3); // 0, 1, or 2
+        const randomAction = Math.floor(Math.random() * 3);
         switch (randomAction) {
             case 0:
                 this.entityControl.moveForward(5);
@@ -131,7 +131,6 @@ class EntityAI {
         const currentPosition = `${Math.round(this.entityRenderer.x)},${Math.round(this.entityRenderer.y)}`;
         this.exploredAreas.add(currentPosition);
 
-        // Check if the entity has moved
         if (this.entityRenderer.x === this.lastPosition.x && this.entityRenderer.y === this.lastPosition.y) {
             this.stationaryCounter++;
         } else {
@@ -157,23 +156,19 @@ class EntityAI {
     calculateReward(sensorData) {
         let reward = 0;
 
-        // Small positive reward for every action (encourages exploration)
         reward += 0.05;
 
-        // Reward for exploring new areas
         if (this.exploredAreas.size % 10 === 0) {
             reward += 0.2;
             if (this.debug) console.log("Positive reward for exploration");
         }
 
-        // Penalty for collisions
         if (this.entityRenderer.checkCollision()) {
             reward -= 0.5;
             this.collisionCounter++;
             if (this.debug) console.log("Negative reward for collision");
         }
 
-        // Reward for sensing and approaching beacons
         const leftBeaconDetected = sensorData.leftSensor.type === 'beacon';
         const rightBeaconDetected = sensorData.rightSensor.type === 'beacon';
         const beaconDistance = Math.min(
@@ -190,10 +185,9 @@ class EntityAI {
                     reward += 0.5;
                     if (this.debug) console.log("Positive reward for approaching beacon");
                 }
-                if (beaconDistance < 10) {
+                if (this.isBeaconReached) {
                     reward += 1;
-                    this.beaconReachedCounter++;
-                    if (this.debug) console.log("Positive reward for reaching beacon");
+                    if (this.debug) console.log("Positive reward for farming beacon");
                 }
                 this.lastBeaconDistance = beaconDistance;
             }
@@ -201,13 +195,11 @@ class EntityAI {
             this.lastBeaconDistance = Infinity;
         }
 
-        // Small penalty for staying stationary or moving in circles
         if (this.stationaryCounter > 10 || this.isMovingInCircles()) {
             reward -= 0.1;
             if (this.debug) console.log("Small negative reward for inactivity or circular movement");
         }
 
-        // Very small penalty for being close to a wall
         if ((sensorData.leftSensor.type === 'wall' && sensorData.leftSensor.distance < 10) ||
             (sensorData.rightSensor.type === 'wall' && sensorData.rightSensor.distance < 10)) {
             reward -= 0.05;
@@ -215,7 +207,19 @@ class EntityAI {
         }
 
         this.cumulativeReward += reward;
-        return [reward, 0, 0];  // Format expected by the neural network
+        return [reward, 0, 0];
+    }
+
+    onBeaconReached() {
+        this.isBeaconReached = true;
+        if (this.debug) console.log("Beacon reached and being farmed");
+    }
+
+    onBeaconRelocated() {
+        this.beaconReachedCounter++;
+        this.isBeaconReached = false;
+        this.lastBeaconDistance = Infinity;
+        if (this.debug) console.log("Beacon relocated. Total beacons reached:", this.beaconReachedCounter);
     }
 
     isMovingInCircles() {
@@ -230,15 +234,14 @@ class EntityAI {
 
     isRepetitiveOrInactive() {
         const currentTime = Date.now();
-        const timeThreshold = 5000; // 5 seconds
+        const timeThreshold = 5000;
         if (this.actionHistory.length === 0 || (currentTime - this.lastActionTime) > timeThreshold) {
-            return true; // Inactive if no actions or last action was long ago
+            return true;
         }
 
-        // Check if the last 5 actions are the same
         const recentActions = this.actionHistory.slice(-5).map(a => a.action);
         const mostCommonAction = this.findMostCommonAction(recentActions);
-        const repetitionThreshold = 0.8; // 80% of actions are the same
+        const repetitionThreshold = 0.8;
         const isRepetitive = recentActions.filter(action => action === mostCommonAction).length / recentActions.length > repetitionThreshold;
 
         return isRepetitive;
@@ -273,32 +276,70 @@ class EntityAI {
     }
 
     saveState() {
+        console.log("Starting saveState process");
+        const weights = this.brain.weights;
+        const biases = this.brain.biases;
+
+        for (let layer = 0; layer < weights.length; layer++) {
+            console.log(`Saving weights for layer ${layer}`);
+            this.saveLayerState(layer, 'weight', weights[layer]);
+            console.log(`Saving biases for layer ${layer}`);
+            this.saveLayerState(layer, 'bias', biases[layer]);
+        }
+
+        // Save additional state information
+        console.log("Saving metadata");
+        this.saveLayerState('metadata', 'exploredAreas', Array.from(this.exploredAreas));
+        this.saveLayerState('metadata', 'cumulativeReward', this.cumulativeReward);
+        this.saveLayerState('metadata', 'collisionCounter', this.collisionCounter);
+        this.saveLayerState('metadata', 'beaconReachedCounter', this.beaconReachedCounter);
+    }
+
+    saveLayerState(layer, type, data) {
+        console.log(`Preparing to save state for layer: ${layer}, type: ${type}`);
         const state = {
-            weights: this.brain.weights,
-            biases: this.brain.biases,
-            exploredAreas: Array.from(this.exploredAreas),
-            cumulativeReward: this.cumulativeReward,
-            collisionCounter: this.collisionCounter,
-            beaconReachedCounter: this.beaconReachedCounter
+            layer: layer,
+            type: type,
+            data: JSON.stringify(data)
         };
 
+        console.log(`Sending request to save state`, state);
         fetch('../src/api/saveState.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(state)
         })
-            .then(response => response.json())
-            .then(data => console.log("State saved successfully", data))
-            .catch(error => console.error('Error saving state', error));
+            .then(response => {
+                console.log(`Received response with status: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                console.log(`State saved successfully for layer ${layer}, type ${type}`, data);
+            })
+            .catch(error => {
+                console.error(`Error saving state for layer ${layer}, type ${type}:`, error);
+            });
     }
-
+    
     loadState(state) {
         if (state && state.weights && state.biases) {
-            this.brain.importState({ weights: state.weights, biases: state.biases });
-            this.exploredAreas = new Set(state.exploredAreas || []);
-            this.cumulativeReward = state.cumulativeReward || 0;
-            this.collisionCounter = state.collisionCounter || 0;
-            this.beaconReachedCounter = state.beaconReachedCounter || 0;
+            const weightsArray = Object.keys(state.weights).sort().map(key => state.weights[key]);
+            const biasesArray = Object.keys(state.biases).sort().map(key => state.biases[key]);
+
+            const formattedState = {
+                weights: weightsArray,
+                biases: biasesArray
+            };
+
+            this.brain.importState(formattedState);
+
+            // Load additional state information
+            if (state.metadata) {
+                this.exploredAreas = new Set(state.metadata.exploredAreas || []);
+                this.cumulativeReward = state.metadata.cumulativeReward || 0;
+                this.collisionCounter = state.metadata.collisionCounter || 0;
+                this.beaconReachedCounter = state.metadata.beaconReachedCounter || 0;
+            }
         } else {
             console.error('Invalid state structure:', state);
         }

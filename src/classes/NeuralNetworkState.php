@@ -9,31 +9,30 @@ class NeuralNetworkState
         $this->conn = $db;
     }
 
-    // Function to save the state of the neural network
     public function saveState($layer, $type, $data)
     {
+        error_log("Attempting to save state: layer=$layer, type=$type");
         $query = "INSERT INTO neural_network_state (layer, type, data) VALUES (:layer, :type, :data)";
         $stmt = $this->conn->prepare($query);
 
-        $jsonData = json_encode($data); // Assign to a variable
-
         $stmt->bindParam(':layer', $layer);
         $stmt->bindParam(':type', $type);
-        $stmt->bindParam(':data', $jsonData); // Bind the variable
+        $stmt->bindParam(':data', $data);
 
-        if ($stmt->execute()) {
-            return true;
-        } else {
+        try {
+            $result = $stmt->execute();
+            error_log("Query executed. Result: " . ($result ? "true" : "false"));
+            return $result;
+        } catch (PDOException $e) {
+            error_log("Database error: " . $e->getMessage());
             return false;
         }
     }
 
-    // Function to load the most recent state of the neural network
     public function loadState()
     {
-        // Query to select the latest record for each layer and type
         $query = "SELECT * FROM (
-                    SELECT *, ROW_NUMBER() OVER (PARTITION BY layer, type ORDER BY id DESC) as rn 
+                    SELECT *, ROW_NUMBER() OVER (PARTITION BY layer, type ORDER BY id DESC) as rn
                     FROM neural_network_state
                   ) as sub
                   WHERE rn = 1";
@@ -49,4 +48,3 @@ class NeuralNetworkState
         return $results;
     }
 }
-?>

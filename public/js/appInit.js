@@ -22,6 +22,8 @@ function initializeSimulation() {
 
     // Create a beacon
     let beacon = new Beacon(400, 400);
+    let beaconReachedTime = null;
+    const beaconFarmingDuration = 3000; // 5 seconds in milliseconds
 
     // Start the AI monitoring process
     entityAI.startMonitoring();
@@ -35,16 +37,31 @@ function initializeSimulation() {
     }
 
     // Main rendering and update loop
-    function gameLoop() {
+    function gameLoop(timestamp) {
         entityRenderer.clearCanvas();
         mapRenderer.drawMap();
 
+        const entityPosition = entityRenderer.getPosition();
+
         // Check if beacon is reached
-        if (beacon.isReached(entityRenderer.x, entityRenderer.y)) {
-            console.log("Beacon reached!");
-            const newLocation = generateNewBeaconLocation();
-            beacon.setLocation(newLocation.x, newLocation.y);
-            entityAI.onBeaconReached(); // Notify AI that a beacon was reached
+        if (beacon.isReached(entityPosition.x, entityPosition.y)) {
+            if (beaconReachedTime === null) {
+                beaconReachedTime = timestamp;
+                console.log("Beacon reached at position:", beacon.x, beacon.y);
+            }
+
+            // Check if farming duration has passed
+            if (timestamp - beaconReachedTime >= beaconFarmingDuration) {
+                const newLocation = generateNewBeaconLocation();
+                beacon.setLocation(newLocation.x, newLocation.y);
+                console.log("Beacon relocated to:", beacon.x, beacon.y);
+                entityAI.onBeaconRelocated(); // Notify AI that the beacon was relocated
+                beaconReachedTime = null;
+            } else {
+                entityAI.onBeaconReached(); // Notify AI that a beacon is being farmed
+            }
+        } else {
+            beaconReachedTime = null;
         }
 
         // Render beacon
@@ -58,7 +75,7 @@ function initializeSimulation() {
     }
 
     // Start the game loop
-    gameLoop();
+    requestAnimationFrame(gameLoop);
 
     // Handle keyboard input for manual entity control
     document.addEventListener('keydown', (event) => {
@@ -93,7 +110,7 @@ function initializeSimulation() {
     // Periodically save state
     setInterval(() => {
         entityAI.saveState();
-    }, 300000); // Save every 5 minutes
+    }, 60000); // Save every minute
 
     // Display AI state and performance metrics
     function updateDisplay() {
