@@ -9,7 +9,11 @@ class EntityAI {
         this.epsilon = 0.2;
         this.lastActionTime = Date.now();
         this.actionHistory = [];
-        this.actionCooldown = 5000;
+        this.baseActionCooldown = 1000;
+        this.maxActionCooldown = 5000;
+        this.minActionCooldown = 500;
+        this.actionCooldown = this.baseActionCooldown;
+        this.successStreak = 0;
         this.debug = true;
 
         this.exploredAreas = new Set();
@@ -146,6 +150,25 @@ class EntityAI {
         }
         const currentSensorData = this.sensorControl.getSensorData();
         let reward = this.calculateReward(currentSensorData);
+
+        if (reward > 0.3) {
+            this.successStreak++;
+            this.actionCooldown = Math.max(
+                this.minActionCooldown,
+                this.actionCooldown * 0.95
+            );
+        } else if (reward < -0.2) {
+            this.successStreak = 0;
+            this.actionCooldown = Math.min(
+                this.maxActionCooldown,
+                this.actionCooldown * 1.1
+            );
+        }
+
+        if (this.successStreak > 10) {
+            this.actionCooldown = this.baseActionCooldown;
+            this.successStreak = 0;
+        }
 
         if (this.previousState) {
             this.brain.train([{ inputs: this.previousState.inputArray, targets: reward }], 1);
@@ -320,7 +343,7 @@ class EntityAI {
                 console.error(`Error saving state for layer ${layer}, type ${type}:`, error);
             });
     }
-    
+
     loadState(state) {
         if (state && state.weights && state.biases) {
             const weightsArray = Object.keys(state.weights).sort().map(key => state.weights[key]);
