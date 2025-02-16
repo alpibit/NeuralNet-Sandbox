@@ -81,6 +81,36 @@ class EntityAI {
         const actionThreshold = 0.4;
         let actionTaken = false;
 
+        // Draw decision confidence bars
+        if (this.debug) {
+            const barWidth = 50;
+            const barHeight = 15;
+            const startX = 10;
+            const startY = 10;
+            const ctx = this.entityRenderer.ctx;
+
+            // Forward confidence
+            ctx.fillStyle = decision[0] > actionThreshold ? 'rgba(0, 255, 0, 0.7)' : 'rgba(255, 0, 0, 0.7)';
+            ctx.fillRect(startX, startY, barWidth * decision[0], barHeight);
+            ctx.strokeRect(startX, startY, barWidth, barHeight);
+            ctx.fillStyle = 'white';
+            ctx.fillText('Forward', startX + 5, startY + 12);
+
+            // Left turn confidence
+            ctx.fillStyle = decision[1] > actionThreshold ? 'rgba(0, 255, 0, 0.7)' : 'rgba(255, 0, 0, 0.7)';
+            ctx.fillRect(startX, startY + 20, barWidth * decision[1], barHeight);
+            ctx.strokeRect(startX, startY + 20, barWidth, barHeight);
+            ctx.fillStyle = 'white';
+            ctx.fillText('Left', startX + 5, startY + 32);
+
+            // Right turn confidence
+            ctx.fillStyle = decision[2] > actionThreshold ? 'rgba(0, 255, 0, 0.7)' : 'rgba(255, 0, 0, 0.7)';
+            ctx.fillRect(startX, startY + 40, barWidth * decision[2], barHeight);
+            ctx.strokeRect(startX, startY + 40, barWidth, barHeight);
+            ctx.fillStyle = 'white';
+            ctx.fillText('Right', startX + 5, startY + 52);
+        }
+
         if (decision[0] > actionThreshold) {
             this.entityControl.moveForward(5);
             this.lastAction = 'moveForward';
